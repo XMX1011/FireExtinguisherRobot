@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.10)
+project(InfraredFireDetection LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 11) # 或者更高版本 C++14, C++17
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+# 找到 OpenCV 包
+set(OpenCV_DIR "C:/dev/opencv411/opencv/build")
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+
+# 添加头文件目录 (如果 src/ 也是头文件搜索路径的一部分)
+include_directories(
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/include 
+)
+
+
+# 添加源文件
+add_executable(${PROJECT_NAME}
+    src/main.cpp
+    src/vision_processing.cpp
+)
+
+# 链接 OpenCV 库
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
