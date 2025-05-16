@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.10)
+project(FER)
+
+# 设置C++编译标准为C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 指定OpenCV路径并查找包
+set(OpenCV_DIR "C:/dev/opencv411/opencv/build")
+find_package(OpenCV REQUIRED)
+
+# 定义源文件
+set(SOURCE
+    src/main.cpp
+    src/utils.cpp
+    src/visionModule.cpp
+    src/thermoCam.cpp
+)
+
+# 创建可执行文件
+add_executable(FER ${SOURCE})
+
+# 设置包含目录
+target_include_directories(FER PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${OpenCV_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# 链接OpenCV库
+target_link_libraries(FER PRIVATE ${OpenCV_LIBS})
