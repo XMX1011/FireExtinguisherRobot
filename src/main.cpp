@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // src/main.cpp
 #include "vision_processing.h" // 主要的视觉处理函数
 #include "utils.h"             // 结构体, 全局参数, 辅助函数声明
@@ -132,5 +133,26 @@ int main()
 
     cv::destroyAllWindows();
     std::cout << "Vision Processing Terminated." << std::endl;
+=======
+#include <iostream>
+#include <string>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+
+// #include "thermoCam.h"
+// #include "visionModule.h"
+
+using namespace std;
+using namespace cv;
+int main(char *argv[], int argc)
+{
+    // 读取红外相机获取的温度图片
+    Mat image = imread("E:/Intern/FireExtinguisherRobot/testImage/01.JPG");
+    cout << image.rows << " " << image.cols << endl;
+    imshow("image", image);
+    waitKey(0);
+    
+>>>>>>> ecf7634d062a2105e7affdb5382547299a00cd37
     return 0;
 }
