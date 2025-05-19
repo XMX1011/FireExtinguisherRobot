@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // src/main.cpp
 #include "vision_processing.h" // 主要的视觉处理函数
 #include "utils.h"             // 结构体, 全局参数, 辅助函数声明
@@ -7,8 +6,8 @@
 
 // --- 全局相机参数定义 (在 utils.h 中声明为 extern) ---
 // 这些值理想情况下从 config/camera_params.xml 加载
-cv::Mat CAMERA_MATRIX = (cv::Mat_<double>(3, 3) << 500.0, 0.0, 320.0,
-                         0.0, 500.0, 240.0,
+cv::Mat CAMERA_MATRIX = (cv::Mat_<double>(3, 3) << 500.0, 0.0, 264.0,
+                         0.0, 500.0, 238.0,
                          0.0, 0.0, 1.0);
 cv::Mat DIST_COEFFS = cv::Mat::zeros(4, 1, CV_64F);
 
@@ -69,8 +68,10 @@ int main()
     cv::Mat temperature_matrix;
     cv::Mat display_image;
 
-    int frame_rows = 480;
-    int frame_cols = 640;
+    temperature_matrix = cv::imread("../testImage/01.JPG");
+
+    int frame_rows = 476;
+    int frame_cols = 528;
 
     // 尝试从文件加载相机参数
     // 注意：全局的 CAMERA_MATRIX 和 DIST_COEFFS 变量会被这个函数修改
@@ -133,26 +134,5 @@ int main()
 
     cv::destroyAllWindows();
     std::cout << "Vision Processing Terminated." << std::endl;
-=======
-#include <iostream>
-#include <string>
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
-
-// #include "thermoCam.h"
-// #include "visionModule.h"
-
-using namespace std;
-using namespace cv;
-int main(char *argv[], int argc)
-{
-    // 读取红外相机获取的温度图片
-    Mat image = imread("E:/Intern/FireExtinguisherRobot/testImage/01.JPG");
-    cout << image.rows << " " << image.cols << endl;
-    imshow("image", image);
-    waitKey(0);
-    
->>>>>>> ecf7634d062a2105e7affdb5382547299a00cd37
     return 0;
 }

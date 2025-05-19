@@ -21,7 +21,7 @@
 *   **依赖硬件：**
     *   红外热成像相机 (需提供C++ SDK以获取温度矩阵)
     *   工控机，配置： 
-        *   CPU：   i5-5200U，2.2GHz
+        *   CPU：   i5-5200U@2.2GHz
         *   运行内存：   8GDDR3L
         *   硬盘：  64GB
 
@@ -56,7 +56,7 @@
 
 *   **OpenCV:** 版本 4.11.0 。确保已正确安装并配置到您的开发环境中。
     *   安装指南: [OpenCV官方安装文档链接](https://docs.opencv.org/master/d0/d3d/tutorial_general_install.html)
-*   **红外相机SDK:** (请填写您使用的相机型号及其SDK名称和版本)。
+*   **红外相机SDK:** (相机型号及其SDK名称和版本)。
     *   请遵循相机制造商提供的SDK安装和配置指南。
 
 ### 相机标定
@@ -67,7 +67,7 @@
 2.  **采集标定图像：** 从不同角度和距离拍摄标定板的红外图像。
 3.  **运行标定程序：** 使用OpenCV的相机标定函数（如 `cv::calibrateCamera`）或第三方标定工具，计算相机的内参矩阵 (`cameraMatrix`) 和畸变系数 (`distCoeffs`)。
 4.  **配置参数：** 将标定得到的 `cameraMatrix` 和 `distCoeffs` 更新到项目代码中的相应位置 (例如，`main.cpp` 或配置文件中)。
-5.  **场景假设参数：** 根据您的应用场景，合理设置 `ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS`（假设火源平面距离）等参数。如果无法做此假设，基于世界距离的分组逻辑需要调整。
+5.  **场景假设参数：** 根据应用场景，合理设置 `ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS`（假设火源平面距离）等参数。如果无法做此假设，基于世界距离的分组逻辑需要调整。
 
 
 ## 代码结构
