@@ -6,8 +6,8 @@
 
 // --- 全局相机参数定义 (在 utils.h 中声明为 extern) ---
 // 这些值理想情况下从 config/camera_params.xml 加载
-cv::Mat CAMERA_MATRIX = (cv::Mat_<double>(3, 3) << 500.0, 0.0, 264.0,
-                         0.0, 500.0, 238.0,
+cv::Mat CAMERA_MATRIX = (cv::Mat_<double>(3, 3) << 500.0, 0.0, 238.0,
+                         0.0, 500.0, 236.0,
                          0.0, 0.0, 1.0);
 cv::Mat DIST_COEFFS = cv::Mat::zeros(4, 1, CV_64F);
 
@@ -63,15 +63,45 @@ bool loadCameraParameters(const std::string &filename, cv::Mat &cam_matrix, cv::
     return true;
 }
 
+// 从rgb图像到温度矩阵的测试用函数,转换成CV_32FC1格式
+bool convertRGBToTemperatureMatrix(const cv::Mat &rgb_image, cv::Mat &temperature_matrix)
+{
+    // 输入验证
+    if (rgb_image.empty())
+    {
+        std::cerr << "Error: Input RGB image is empty." << std::endl;
+        return false;
+    }
+
+    // 将 RGB 图像转换为灰度图像
+    cv::Mat gray_image;
+    cv::cvtColor(rgb_image, gray_image, cv::COLOR_BGR2GRAY);
+
+    // 将灰度值映射到温度范围 (例如 20°C 到 500°C)
+    gray_image.convertTo(temperature_matrix, CV_32FC1, (500.0f - 20.0f) / 255.0f, 20.0f);
+
+    // 输出验证
+    if (temperature_matrix.empty() || temperature_matrix.type() != CV_32FC1)
+    {
+        std::cerr << "Error: Failed to generate valid temperature matrix." << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
 int main()
 {
     cv::Mat temperature_matrix;
     cv::Mat display_image;
 
-    temperature_matrix = cv::imread("../testImage/01.JPG");
+    cv::Mat image = cv::imread("../testImage/02.JPG");
+    convertRGBToTemperatureMatrix(image, temperature_matrix);
 
-    int frame_rows = 476;
-    int frame_cols = 528;
+    // 假设帧的分辨率数值
+    // 这里采用这个数值是因为网络上截图获取的图片的尺寸如下
+    int frame_rows = 472;
+    int frame_cols = 476;
 
     // 尝试从文件加载相机参数
     // 注意：全局的 CAMERA_MATRIX 和 DIST_COEFFS 变量会被这个函数修改
@@ -87,11 +117,11 @@ int main()
     while (true)
     {
         // 在实际应用中，这里会调用相机SDK的函数
-        if (!getSimulatedTemperatureMatrix(temperature_matrix, frame_rows, frame_cols))
-        {
-            std::cerr << "Error: Could not get temperature matrix." << std::endl;
-            break;
-        }
+        // if (!getSimulatedTemperatureMatrix(temperature_matrix, frame_rows, frame_cols))
+        // {
+        //     std::cerr << "Error: Could not get temperature matrix." << std::endl;
+        //     break;
+        // }
 
         // 核心视觉处理步骤
         // 将全局的相机参数传递给处理函数
