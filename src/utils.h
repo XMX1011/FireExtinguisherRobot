@@ -6,58 +6,105 @@
 #include <vector>
 #include <string> // For std::string if needed later
 
-// --- 配置参数 (可以考虑移到专门的config类或从文件加载) ---
-// 但为了简单，先放在这里，实际项目中这些值可能来自 camera_params.xml 或其他配置
-const float FIRE_TEMPERATURE_THRESHOLD_CELSIUS = 150.0f;
-const double MIN_HOTSPOT_AREA_PIXELS = 30.0;
-const float MAX_GROUPING_DISTANCE_METERS = 1.0f;
-const float ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS = 5.0f; // !!! 强假设 !!!
+/**
+ * @brief 配置参数部分
+ * 这些参数控制热点检测和分组的逻辑，建议在实际项目中从配置文件加载。
+ */
+const float FIRE_TEMPERATURE_THRESHOLD_CELSIUS = 150.0f; ///< 热点温度阈值（摄氏度），高于此值的区域被视为潜在热点。
+const double MIN_HOTSPOT_AREA_PIXELS = 30.0; ///< 热点的最小像素面积，小于该值的区域将被忽略。
+const float MAX_GROUPING_DISTANCE_METERS = 1.0f; ///< 热点分组的最大距离（米），用于合并相邻热点。
+const float ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS = 5.0f; ///< 假设的热点平面距离（米），用于近似世界坐标计算。
 
-// --- 相机内参 (理想情况下从 camera_params.xml 加载) ---
-// 示例值，您必须替换为您的真实相机标定结果
-// 在实际应用中，这些应该在初始化时从文件读取
-extern cv::Mat CAMERA_MATRIX; // 声明为 extern，定义在 main.cpp 或 config加载模块
-extern cv::Mat DIST_COEFFS;   // 声明为 extern
+/**
+ * @brief 相机内参声明
+ * 这些参数应通过相机标定获得，并在初始化时从配置文件加载。
+ */
+extern cv::Mat CAMERA_MATRIX; ///< 相机内参矩阵，包含焦距和主点偏移。
+extern cv::Mat DIST_COEFFS;   ///< 相机畸变系数，用于校正图像畸变。
 
-// --- 结构体定义 ---
+/**
+ * @brief HotSpot 结构体
+ * 表示一个检测到的热点，包含像素坐标、近似世界坐标、面积、最高温度等信息。
+ */
 struct HotSpot
 {
-    int id;
-    cv::Point2f pixel_centroid;
-    cv::Point3f world_coord_approx;
-    double area_pixels;
-    float max_temperature;
-    std::vector<cv::Point> contour_pixels;
-    bool grouped = false;
+    int id; ///< 热点的唯一标识符，初始化为 -1。
+    cv::Point2f pixel_centroid; ///< 热点在图像中的像素中心坐标。
+    cv::Point3f world_coord_approx; ///< 热点的近似世界坐标（基于假设的平面距离）。
+    double area_pixels; ///< 热点的像素面积。
+    float max_temperature; ///< 热点区域内的最高温度。
+    std::vector<cv::Point> contour_pixels; ///< 热点的轮廓像素点集合。
+    bool grouped; ///< 标记该热点是否已被分组，默认为 false。
 
+    /**
+     * @brief 默认构造函数
+     * 初始化热点的默认值。
+     */
     HotSpot() : id(-1), area_pixels(0.0), max_temperature(0.0f), grouped(false) {}
 };
 
+/**
+ * @brief SprayTarget 结构体
+ * 表示一个喷洒目标，包含最终的瞄准点、相关热点 ID 和估计的严重性。
+ */
 struct SprayTarget
 {
-    int id;
-    cv::Point2f final_pixel_aim_point;
-    cv::Point3f final_world_aim_point_approx;
-    std::vector<int> source_hotspot_ids;
-    float estimated_severity;
+    int id; ///< 喷洒目标的唯一标识符，初始化为 -1。
+    cv::Point2f final_pixel_aim_point; ///< 最终的像素瞄准点。
+    cv::Point3f final_world_aim_point_approx; ///< 最终的世界坐标瞄准点（近似值）。
+    std::vector<int> source_hotspot_ids; ///< 构成该目标的相关热点 ID 列表。
+    float estimated_severity; ///< 估计的严重性，用于优先级排序。
 
+    /**
+     * @brief 默认构造函数
+     * 初始化喷洒目标的默认值。
+     */
     SprayTarget() : id(-1), estimated_severity(0.0f) {}
 
-    // 比较函数，用于排序 (按严重性降序)
+    /**
+     * @brief 比较运算符
+     * 用于按严重性降序排序喷洒目标。
+     * 
+     * @param other 另一个喷洒目标对象。
+     * @return true 如果当前目标的严重性高于另一个目标。
+     * @return false 如果当前目标的严重性低于或等于另一个目标。
+     */
     bool operator<(const SprayTarget &other) const
     {
         return estimated_severity > other.estimated_severity;
     }
 };
 
-// --- 通用辅助函数声明 ---
-// (如果 pixelToApproxWorld 和 calculateRealWorldDistance 是纯粹的数学转换，
-// 并且不依赖于 vision_processing 内部状态，可以放在这里)
-
+/**
+ * @brief 将像素坐标转换为近似的世界坐标
+ * 使用相机内参和假设的平面距离计算像素坐标对应的世界坐标。
+ * 
+ * @param pixel_coord 输入的像素坐标 (x, y)。
+ * @param cam_matrix 相机内参矩阵。
+ * @param distance_to_plane 假设的平面距离（米）。
+ * @return cv::Point3f 近似的世界坐标 (X, Y, Z)。
+ */
 cv::Point3f pixelToApproxWorld(const cv::Point2f &pixel_coord, const cv::Mat &cam_matrix, float distance_to_plane);
+
+/**
+ * @brief 计算两个世界坐标点之间的实际距离
+ * 使用欧几里得距离公式计算两点之间的距离。
+ * 
+ * @param p1 第一个世界坐标点 (X1, Y1, Z1)。
+ * @param p2 第二个世界坐标点 (X2, Y2, Z2)。
+ * @return float 两点之间的实际距离（米）。
+ */
 float calculateRealWorldDistance(const cv::Point3f &p1, const cv::Point3f &p2);
 
-// 模拟从SDK获取温度矩阵 (实际项目中替换为真实SDK调用, 可能放在更专门的camera类中)
+/**
+ * @brief 模拟从 SDK 获取温度矩阵
+ * 生成一个模拟的温度矩阵，用于测试和开发。实际项目中应替换为真实的 SDK 调用。
+ * 
+ * @param temp_matrix 输出的温度矩阵，大小为 rows x cols。
+ * @param rows 温度矩阵的行数。
+ * @param cols 温度矩阵的列数。
+ * @return bool 返回 true 表示成功生成温度矩阵，false 表示失败。
+ */
 bool getSimulatedTemperatureMatrix(cv::Mat &temp_matrix, int rows, int cols);
 
 #endif // UTILS_H

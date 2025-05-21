@@ -4,23 +4,26 @@ project(InfraredFireDetection LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17) 
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# 找到 OpenCV 包
-set(OpenCV_DIR "C:/dev/opencv411/opencv/build")
-find_package(OpenCV REQUIRED)
-include_directories(${OpenCV_INCLUDE_DIRS})
+# 尝试自动找到 OpenCV
+find_package(OpenCV QUIET)  # 使用 QUIET 避免直接报错
+if(NOT OpenCV_FOUND)
+    message(WARNING "OpenCV not found automatically. Falling back to hardcoded path.")
+    set(OpenCV_DIR "C:/dev/opencv411/opencv/build")  # 硬编码路径
+    find_package(OpenCV REQUIRED)  # 再次尝试查找
+endif()
 
-# 添加头文件目录 (如果 src/ 也是头文件搜索路径的一部分)
-include_directories(
-    ${PROJECT_SOURCE_DIR}/src
-    ${PROJECT_SOURCE_DIR}/include 
-)
-
-
-# 添加源文件
-add_executable(${PROJECT_NAME}
+# 添加源文件并定义目标
+add_executable(FireDetectionExe  # 定义目标 FireDetectionExe
     src/main.cpp
     src/vision_processing.cpp
 )
 
+# 添加头文件目录（限制在目标范围内）
+target_include_directories(FireDetectionExe PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/include
+    ${OpenCV_INCLUDE_DIRS}
+)
+
 # 链接 OpenCV 库
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
+target_link_libraries(FireDetectionExe PRIVATE ${OpenCV_LIBS})
