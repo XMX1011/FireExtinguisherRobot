@@ -34,11 +34,13 @@ std::vector<SprayTarget> determineSprayTargets(
 /**
  * @brief 在显示图像上绘制检测结果和目标。
  * @param display_image 用于绘制的图像 (通常是伪彩色的温度图)。
+ * @param temp_matrix 用于获取热区的矩阵。
  * @param hot_spots 检测到的热点列表。
  * @param spray_targets 计算得到的喷射目标列表。
  */
 void visualizeResults(
-    cv::Mat &display_image, // 传入引用以直接绘制
+    cv::Mat &display_image,
+    const cv::Mat &temp_matrix,
     const std::vector<HotSpot> &hot_spots,
     const std::vector<SprayTarget> &spray_targets);
 

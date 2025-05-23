@@ -216,7 +216,7 @@ int main()
         cv::Mat normalized_temp;
         cv::normalize(temperature_matrix, normalized_temp, 0, 255, cv::NORM_MINMAX, CV_8UC1);
         cv::applyColorMap(normalized_temp, display_image, cv::COLORMAP_JET);
-        visualizeResults(display_image, hot_spots, spray_targets);
+        visualizeResults(display_image,temperature_matrix , hot_spots, spray_targets);
 
         // 输出喷洒目标信息到控制台
         if (spray_targets.empty())

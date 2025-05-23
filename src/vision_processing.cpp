@@ -191,24 +191,45 @@ std::vector<SprayTarget> determineSprayTargets(
  */
 void visualizeResults(
     cv::Mat &display_image,
+    const cv::Mat &temp_matrix, // 新增参数：原始温度矩阵
     const std::vector<HotSpot> &hot_spots,
     const std::vector<SprayTarget> &spray_targets)
 {
-    // 绘制每个热点的轮廓和像素中心点
+    // 1. 绘制热点的轮廓和像素中心点
     for (const auto &spot : hot_spots)
     {
         cv::drawContours(display_image, std::vector<std::vector<cv::Point>>{spot.contour_pixels}, -1, cv::Scalar(0, 255, 0), 1);
         cv::circle(display_image, spot.pixel_centroid, 3, cv::Scalar(0, 0, 255), -1);
     }
 
-    int target_rank = 1;
+    // 2. 根据温度矩阵绘制等温线（热区边界）
+    cv::Mat binary_mask;
+    cv::threshold(temp_matrix, binary_mask, FIRE_TEMPERATURE_THRESHOLD_CELSIUS, 255.0, cv::THRESH_BINARY);
+    binary_mask.convertTo(binary_mask, CV_8U);
 
-    // 绘制每个喷洒目标的瞄准点和排名
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(binary_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    // 绘制所有高温区域的边界（等温线）
+    cv::drawContours(display_image, contours, -1, cv::Scalar(255, 255, 255), 1); // 白色描边
+
+    // 3. 绘制喷洒目标
+    int target_rank = 1;
     for (const auto &target : spray_targets)
     {
         cv::circle(display_image, target.final_pixel_aim_point, 8, cv::Scalar(255, 0, 255), 2);
         cv::putText(display_image, "T" + std::to_string(target_rank++),
                     target.final_pixel_aim_point + cv::Point2f(10, 0),
                     cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 0), 2);
+
+        for (const auto &spot_id : target.source_hotspot_ids)
+        {
+            if (spot_id < hot_spots.size())
+            {
+                const auto &spot = hot_spots[spot_id];
+                cv::Rect bounding_box = cv::boundingRect(spot.contour_pixels);
+                cv::rectangle(display_image, bounding_box, cv::Scalar(0, 0, 0), 1);
+            }
+        }
     }
 }
