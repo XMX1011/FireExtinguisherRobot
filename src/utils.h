@@ -13,7 +13,7 @@
 const float FIRE_TEMPERATURE_THRESHOLD_CELSIUS = 210.0f; ///< 热点温度阈值（摄氏度），高于此值的区域被视为潜在热点。
 const double MIN_HOTSPOT_AREA_PIXELS = 30.0; ///< 热点的最小像素面积，小于该值的区域将被忽略。
 const float MAX_GROUPING_DISTANCE_METERS = 1.0f; ///< 热点分组的最大距离（米），用于合并相邻热点。
-const float ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS = 6.0f; ///< 假设的热点平面距离（米），用于近似世界坐标计算。
+const float ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS = 9.0f; ///< 假设的热点平面距离（米），用于近似世界坐标计算。
 
 /**
  * @brief 相机内参声明

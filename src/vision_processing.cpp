@@ -6,7 +6,7 @@
 // --- 核心视觉处理函数实现 ---
 
 /**
- * 检测并过滤热点
+ * @brief 检测并过滤热点
  * 
  * @param temp_matrix 温度矩阵
  * @param camera_matrix_param 相机矩阵参数
@@ -24,6 +24,7 @@ std::vector<HotSpot> detectAndFilterHotspots(
 {
     std::vector<HotSpot> detected_spots;
 
+    // 检测温度矩阵是否有效
     if (temp_matrix.empty() || temp_matrix.type() != CV_32FC1)
     {
         std::cerr << "Error: Temperature matrix is empty or not CV_32FC1 type." << std::endl;
@@ -83,7 +84,7 @@ std::vector<HotSpot> detectAndFilterHotspots(
 }
 
 /**
- * 确定喷洒目标
+ * @brief 确定喷洒目标
  * 
  * @param hot_spots 热点向量
  * @param max_grouping_distance_param 最大分组距离参数
@@ -149,7 +150,7 @@ std::vector<SprayTarget> determineSprayTargets(
 }
 
 /**
- * 可视化结果
+ * @brief 可视化结果
  * 
  * @param display_image 显示图像
  * @param temp_matrix 温度矩阵

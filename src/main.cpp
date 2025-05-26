@@ -12,6 +12,8 @@ cv::Mat CAMERA_MATRIX = (cv::Mat_<double>(3, 3) << 500.0, 0.0, 238.0,
 cv::Mat DIST_COEFFS = cv::Mat::zeros(4, 1, CV_64F);
 
 // --- utils.h 中声明的辅助函数实现 ---
+
+// ! 具体距离、角度等内容的坐标转换需要之后根据实际情况实现
 /**
  * @brief 将像素坐标转换为近似的世界坐标。
  *
@@ -63,6 +65,7 @@ float calculateRealWorldDistance(const cv::Point3f &p1, const cv::Point3f &p2)
     return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2) + std::pow(p1.z - p2.z, 2));
 }
 
+// ! 这个作为初期测试使用，目前可以废弃或者删除
 /**
  * @brief 生成模拟的温度矩阵。
  *
@@ -123,6 +126,7 @@ bool loadCameraParameters(const std::string &filename, cv::Mat &cam_matrix, cv::
     return true;
 }
 
+// ! 下面的函数是作为使用网络图片的测试用函数，具体温度矩阵等待红外相机
 /**
  * @brief 将 RGB 图像转换为温度矩阵。
  *
@@ -187,14 +191,16 @@ int main()
 
     // 尝试从文件加载相机参数
     // 注意：全局的 CAMERA_MATRIX 和 DIST_COEFFS 变量会被这个函数修改
-    std::string camera_params_file = "../config/camera_params.xml"; // 假设config在项目根目录的上一级
+    std::string camera_params_file = "../config/camera_params.xml"; // config在项目根目录的上一级
     if (!loadCameraParameters(camera_params_file, CAMERA_MATRIX, DIST_COEFFS))
     {
         // 如果加载失败，将使用在 main.cpp 顶部定义的硬编码值
+        std::cout << "Failed to load camera parameters from " << camera_params_file << std::endl;
+        std::cout << "Using hardcoded camera parameters instead." << std::endl;
     }
 
     // 打印程序启动信息
-    std::cout << "Vision Processing for Fire Suppression Started." << std::endl;
+    std::cout << "Vision Processing for Fire Detection Started." << std::endl;
     std::cout << "Press 'q' or ESC to exit." << std::endl;
 
     // 主循环：持续处理温度矩阵并检测热点
