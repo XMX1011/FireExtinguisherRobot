@@ -177,6 +177,12 @@ bool convertRGBToTemperatureMatrix(const cv::Mat &rgb_image, cv::Mat &temperatur
  */
 int main(int argc, char **argv)
 {
+    if (argc != 2) // 检查命令行参数个数
+    {
+        std::cout << "Usage: " << argv[0] << " <input_image>" << std::endl;
+        return 1;
+    }
+    
     cv::Mat temperature_matrix; // 存储温度矩阵
     cv::Mat display_image;      // 用于显示的图像
 
