@@ -175,22 +175,25 @@ bool convertRGBToTemperatureMatrix(const cv::Mat &rgb_image, cv::Mat &temperatur
  *
  * @return int 返回 0 表示程序正常结束。
  */
-int main()
+int main(int argc, char **argv)
 {
     cv::Mat temperature_matrix; // 存储温度矩阵
     cv::Mat display_image;      // 用于显示的图像
 
     // 加载测试图像并将其转换为温度矩阵
-    cv::Mat image = cv::imread("../testImage/02.JPG");
+    // cv::Mat image = cv::imread("../testImage/02.JPG");
+    // 修改为从程序参数中获取图像路径
+    cv::Mat image = cv::imread(argv[1]);
     convertRGBToTemperatureMatrix(image, temperature_matrix);
 
     // 假设帧的分辨率数值
-    // 这里采用这个数值是因为网络上截图获取的图片的尺寸如下
-    int frame_rows = 472;
-    int frame_cols = 476;
+    // 通过读取的图片的本身来修改frame尺寸
+    int frame_rows = image.rows;
+    int frame_cols = image.cols;
 
     // 尝试从文件加载相机参数
     // 注意：全局的 CAMERA_MATRIX 和 DIST_COEFFS 变量会被这个函数修改
+    // 但是实际只有一个相机，并且从配置文件里读方便针对不同的相机进行修改
     std::string camera_params_file = "../config/camera_params.xml"; // config在项目根目录的上一级
     if (!loadCameraParameters(camera_params_file, CAMERA_MATRIX, DIST_COEFFS))
     {
