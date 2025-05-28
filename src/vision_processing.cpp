@@ -39,7 +39,7 @@ std::vector<HotSpot> detectAndFilterHotspots(
     }
 
     cv::Mat binary_mask;
-    cv::threshold(temp_matrix, binary_mask, FIRE_TEMPERATURE_THRESHOLD_CELSIUS, 255.0, cv::THRESH_BINARY);
+    cv::threshold(temp_matrix, binary_mask, temperature_threshold, 255.0, cv::THRESH_BINARY);
     binary_mask.convertTo(binary_mask, CV_8U);
 
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
@@ -54,7 +54,7 @@ std::vector<HotSpot> detectAndFilterHotspots(
     for (const auto &contour : contours)
     {
         double area = cv::contourArea(contour);
-        if (area < MIN_HOTSPOT_AREA_PIXELS)
+        if (area < min_hotspot_area_pixels)
             continue;
 
         cv::Moments M = cv::moments(contour);
@@ -174,7 +174,7 @@ void visualizeResults(
     }
 
     cv::Mat binary_mask;
-    cv::threshold(temp_matrix, binary_mask, FIRE_TEMPERATURE_THRESHOLD_CELSIUS, 255.0, cv::THRESH_BINARY);
+    cv::threshold(temp_matrix, binary_mask, temperature_threshold, 255.0, cv::THRESH_BINARY);
     binary_mask.convertTo(binary_mask, CV_8U);
 
     std::vector<std::vector<cv::Point>> contours;

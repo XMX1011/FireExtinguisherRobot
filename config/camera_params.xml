@@ -14,4 +14,7 @@
   <dt>d</dt>
   <data>
     0.0 0.0 0.0 0.0 0.0 </data></distortion_coefficients> <!-- k1, k2, p1, p2, k3 -->
+<temperature_threshold>210.0</temperature_threshold>
+<min_hotspot_area_pixels>30.0</min_hotspot_area_pixels>
+<max_grouping_distance_meters>1.0</max_grouping_distance_meters>
 </opencv_storage>

@@ -5,11 +5,16 @@
 #include <opencv2/opencv.hpp> // 确保包含OpenCV
 
 // --- 全局相机参数定义 (在 utils.h 中声明为 extern) ---
-// 这些值理想情况下从 config/camera_params.xml 加载
-cv::Mat CAMERA_MATRIX = (cv::Mat_<double>(3, 3) << 500.0, 0.0, 238.0,
-                         0.0, 500.0, 236.0,
-                         0.0, 0.0, 1.0);
-cv::Mat DIST_COEFFS = cv::Mat::zeros(4, 1, CV_64F);
+// // 这些值理想情况下从 config/camera_params.xml 加载
+// cv::Mat CAMERA_MATRIX = (cv::Mat_<double>(3, 3) << 500.0, 0.0, 238.0,
+//                          0.0, 500.0, 236.0,
+//                          0.0, 0.0, 1.0);
+// cv::Mat DIST_COEFFS = cv::Mat::zeros(4, 1, CV_64F);
+cv::Mat CAMERA_MATRIX;
+cv::Mat DIST_COEFFS;
+float temperature_threshold;
+double  min_hotspot_area_pixels;
+float max_grouping_distance_meters;
 
 // --- utils.h 中声明的辅助函数实现 ---
 
@@ -105,7 +110,12 @@ bool getSimulatedTemperatureMatrix(cv::Mat &temp_matrix, int rows, int cols)
  * @param dist_coeffs_out 用于存储加载的畸变系数矩阵（输出）。
  * @return bool 返回 true 表示加载成功，false 表示加载失败。
  */
-bool loadCameraParameters(const std::string &filename, cv::Mat &cam_matrix, cv::Mat &dist_coeffs_out)
+bool loadCameraParameters(const std::string &filename, 
+                            cv::Mat &cam_matrix, 
+                            cv::Mat &dist_coeffs_out, 
+                            float &temperature_threshold,
+                            double &min_hotspot_area_pixels,
+                            float &max_grouping_distance_meters)
 {
     // 尝试打开指定的相机参数文件
     cv::FileStorage fs(filename, cv::FileStorage::READ);
@@ -119,6 +129,9 @@ bool loadCameraParameters(const std::string &filename, cv::Mat &cam_matrix, cv::
     // 从文件中读取相机内参矩阵和畸变系数
     fs["camera_matrix"] >> cam_matrix;
     fs["distortion_coefficients"] >> dist_coeffs_out;
+    fs["temperature_threshold"] >> temperature_threshold;
+    fs["min_hotspot_area_pixels"] >> min_hotspot_area_pixels;
+    fs["max_grouping_distance_meters"] >> max_grouping_distance_meters ; 
     fs.release();
 
     // 输出成功加载的信息
@@ -182,7 +195,7 @@ int main(int argc, char **argv)
         std::cout << "Usage: " << argv[0] << " <input_image>" << std::endl;
         return 1;
     }
-    
+
     cv::Mat temperature_matrix; // 存储温度矩阵
     cv::Mat display_image;      // 用于显示的图像
 
@@ -201,7 +214,7 @@ int main(int argc, char **argv)
     // 注意：全局的 CAMERA_MATRIX 和 DIST_COEFFS 变量会被这个函数修改
     // 但是实际只有一个相机，并且从配置文件里读方便针对不同的相机进行修改
     std::string camera_params_file = "../config/camera_params.xml"; // config在项目根目录的上一级
-    if (!loadCameraParameters(camera_params_file, CAMERA_MATRIX, DIST_COEFFS))
+    if (!loadCameraParameters(camera_params_file, CAMERA_MATRIX, DIST_COEFFS, temperature_threshold, min_hotspot_area_pixels, max_grouping_distance_meters))
     {
         // 如果加载失败，将使用在 main.cpp 顶部定义的硬编码值
         std::cout << "Failed to load camera parameters from " << camera_params_file << std::endl;
@@ -225,13 +238,13 @@ int main(int argc, char **argv)
         // 核心视觉处理步骤
         // 将全局的相机参数传递给处理函数
         std::vector<HotSpot> hot_spots = detectAndFilterHotspots(temperature_matrix, CAMERA_MATRIX, ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS);
-        std::vector<SprayTarget> spray_targets = determineSprayTargets(hot_spots, MAX_GROUPING_DISTANCE_METERS);
+        std::vector<SprayTarget> spray_targets = determineSprayTargets(hot_spots, max_grouping_distance_meters);
 
         // 可视化处理结果
         cv::Mat normalized_temp;
         cv::normalize(temperature_matrix, normalized_temp, 0, 255, cv::NORM_MINMAX, CV_8UC1);
         cv::applyColorMap(normalized_temp, display_image, cv::COLORMAP_JET);
-        visualizeResults(display_image,temperature_matrix , hot_spots, spray_targets);
+        visualizeResults(display_image, temperature_matrix, hot_spots, spray_targets);
 
         // 输出喷洒目标信息到控制台
         if (spray_targets.empty())

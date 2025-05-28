@@ -9,10 +9,11 @@
 /**
  * @brief 配置参数部分
  * 这些参数控制热点检测和分组的逻辑，建议在实际项目中从配置文件加载。
+ * 现在已经修改为从配置文件xml中加载
  */
-const float FIRE_TEMPERATURE_THRESHOLD_CELSIUS = 210.0f; ///< 热点温度阈值（摄氏度），高于此值的区域被视为潜在热点。
-const double MIN_HOTSPOT_AREA_PIXELS = 30.0; ///< 热点的最小像素面积，小于该值的区域将被忽略。
-const float MAX_GROUPING_DISTANCE_METERS = 1.0f; ///< 热点分组的最大距离（米），用于合并相邻热点。
+// const float FIRE_TEMPERATURE_THRESHOLD_CELSIUS = 210.0f; ///< 热点温度阈值（摄氏度），高于此值的区域被视为潜在热点。
+// const double MIN_HOTSPOT_AREA_PIXELS = 30.0; ///< 热点的最小像素面积，小于该值的区域将被忽略。
+// const float MAX_GROUPING_DISTANCE_METERS = 1.0f; ///< 热点分组的最大距离（米），用于合并相邻热点。
 const float ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS = 9.0f; ///< 假设的热点平面距离（米），用于近似世界坐标计算。
 
 /**
@@ -21,6 +22,9 @@ const float ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS = 9.0f; ///< 假设的热点�
  */
 extern cv::Mat CAMERA_MATRIX; ///< 相机内参矩阵，包含焦距和主点偏移。
 extern cv::Mat DIST_COEFFS;   ///< 相机畸变系数，用于校正图像畸变。
+extern float temperature_threshold; ///< 阈值，用于过滤温度低于阈值的热点。
+extern double min_hotspot_area_pixels; ///< 最小热点面积，用于过滤太小的热点。
+extern float max_grouping_distance_meters; ///< 最大分组距离，用于将相似位置的热点分组。
 
 /**
  * @brief HotSpot 结构体
@@ -106,5 +110,16 @@ float calculateRealWorldDistance(const cv::Point3f &p1, const cv::Point3f &p2);
  * @return bool 返回 true 表示成功生成温度矩阵，false 表示失败。
  */
 bool getSimulatedTemperatureMatrix(cv::Mat &temp_matrix, int rows, int cols);
+
+/**
+ * @brief 获取实际热点的距离的函数
+ *  尚待具体实现，实现方法未知
+ * 
+ * @param temp_matrix 输入的温度矩阵，大小为 rows x cols。
+ * @param rows 输入温度矩阵的行数。
+ * @param cols 输入温度矩阵的列数。
+ * @return float 返回实际热点的距离。
+ */
+float getActualDistance(const cv::Mat &temp_matrix, int rows, int cols);
 
 #endif // UTILS_H
