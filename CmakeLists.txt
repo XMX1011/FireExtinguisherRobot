@@ -16,6 +16,7 @@ endif()
 add_executable(FireDetectionExe  # 定义目标 FireDetectionExe
     src/main.cpp
     src/vision_processing.cpp
+    src/thermoCam.cpp
 )
 
 # 添加头文件目录（限制在目标范围内）

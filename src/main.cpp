@@ -1,11 +1,12 @@
 // src/main.cpp
 #include "vision_processing.h" // 主要的视觉处理函数
 #include "utils.h"             // 结构体, 全局参数, 辅助函数声明
+#include "thermoCam.h"         // 热成像相机调用和使用
 #include <iostream>
 #include <opencv2/opencv.hpp> // 确保包含OpenCV
 
 // --- 全局相机参数定义 (在 utils.h 中声明为 extern) ---
-// // 这些值理想情况下从 config/camera_params.xml 加载
+// // 这些值理想情况下从 config/camera_params.xml 加载，这里使用一个假数据占位
 // cv::Mat CAMERA_MATRIX = (cv::Mat_<double>(3, 3) << 500.0, 0.0, 238.0,
 //                          0.0, 500.0, 236.0,
 //                          0.0, 0.0, 1.0);
@@ -202,6 +203,8 @@ int main(int argc, char **argv)
     // 加载测试图像并将其转换为温度矩阵
     // cv::Mat image = cv::imread("../testImage/02.JPG");
     // 修改为从程序参数中获取图像路径
+    // 如果相机连接则取消使用图像路径进行识别
+    // 同时使用相机则不需要转换为温度矩阵的实现
     cv::Mat image = cv::imread(argv[1]);
     convertRGBToTemperatureMatrix(image, temperature_matrix);
 
