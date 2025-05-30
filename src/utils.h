@@ -113,7 +113,7 @@ bool getSimulatedTemperatureMatrix(cv::Mat &temp_matrix, int rows, int cols);
 
 /**
  * @brief 获取实际热点的距离的函数
- *  尚待具体实现，实现方法未知
+ *  TODO : 尚待具体实现，实现方法未知
  * 
  * @param temp_matrix 输入的温度矩阵，大小为 rows x cols。
  * @param rows 输入温度矩阵的行数。

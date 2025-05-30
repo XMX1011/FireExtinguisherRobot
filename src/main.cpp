@@ -210,8 +210,8 @@ int main(int argc, char **argv)
 
     // 假设帧的分辨率数值
     // 通过读取的图片的本身来修改frame尺寸
-    int frame_rows = image.rows;
-    int frame_cols = image.cols;
+    int frame_rows = temperature_matrix.rows;
+    int frame_cols = temperature_matrix.cols;
 
     // 尝试从文件加载相机参数
     // 注意：全局的 CAMERA_MATRIX 和 DIST_COEFFS 变量会被这个函数修改
@@ -231,12 +231,7 @@ int main(int argc, char **argv)
     // 主循环：持续处理温度矩阵并检测热点
     while (true)
     {
-        // 在实际应用中，这里会调用相机SDK的函数
-        // if (!getSimulatedTemperatureMatrix(temperature_matrix, frame_rows, frame_cols))
-        // {
-        //     std::cerr << "Error: Could not get temperature matrix." << std::endl;
-        //     break;
-        // }
+        // TODO:在实际应用中，这里会调用相机SDK的函数
 
         // 核心视觉处理步骤
         // 将全局的相机参数传递给处理函数
