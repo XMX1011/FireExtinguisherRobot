@@ -26,6 +26,11 @@ extern float temperature_threshold; ///< 阈值，用于过滤温度低于阈值
 extern double min_hotspot_area_pixels; ///< 最小热点面积，用于过滤太小的热点。
 extern float max_grouping_distance_meters; ///< 最大分组距离，用于将相似位置的热点分组。
 
+extern float HFOV;  ///< 相机水平视场角，用于计算像素坐标和世界坐标之间的转换。
+extern float VFOV;  ///< 相机垂直视场角，用于计算像素坐标和世界坐标之间的转换。
+extern float Horizontal_angle_per_pixel;    ///< 水平角度每像素，用于基于角度像素间关系进行坐标转换和运动指令
+extern float Vertical_angle_per_pixel;  ///< 垂直角度每像素
+
 /**
  * @brief HotSpot 结构体
  * 表示一个检测到的热点，包含像素坐标、近似世界坐标、面积、最高温度等信息。
@@ -93,6 +98,7 @@ cv::Point3f pixelToApproxWorld(const cv::Point2f &pixel_coord, const cv::Mat &ca
 /**
  * @brief 计算两个世界坐标点之间的实际距离
  * 使用欧几里得距离公式计算两点之间的距离。
+ * TODO: 转化为使用球坐标系的距离计算方式
  * 
  * @param p1 第一个世界坐标点 (X1, Y1, Z1)。
  * @param p2 第二个世界坐标点 (X2, Y2, Z2)。
@@ -112,14 +118,9 @@ float calculateRealWorldDistance(const cv::Point3f &p1, const cv::Point3f &p2);
 bool getSimulatedTemperatureMatrix(cv::Mat &temp_matrix, int rows, int cols);
 
 /**
- * @brief 获取实际热点的距离的函数
- *  TODO : 尚待具体实现，实现方法未知
+ * @brief 建立基于回转，俯仰的球坐标系和转换
+ * ! 所有的内容都需要从3维笛卡尔坐标转化为球坐标系
  * 
- * @param temp_matrix 输入的温度矩阵，大小为 rows x cols。
- * @param rows 输入温度矩阵的行数。
- * @param cols 输入温度矩阵的列数。
- * @return float 返回实际热点的距离。
  */
-float getActualDistance(const cv::Mat &temp_matrix, int rows, int cols);
 
 #endif // UTILS_H

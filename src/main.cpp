@@ -216,7 +216,7 @@ int main(int argc, char **argv)
     // 尝试从文件加载相机参数
     // 注意：全局的 CAMERA_MATRIX 和 DIST_COEFFS 变量会被这个函数修改
     // 但是实际只有一个相机，并且从配置文件里读方便针对不同的相机进行修改
-    std::string camera_params_file = "../config/camera_params.xml"; // config在项目根目录的上一级
+    std::string camera_params_file = "../config/params.xml"; // config在项目根目录的上一级
     if (!loadCameraParameters(camera_params_file, CAMERA_MATRIX, DIST_COEFFS, temperature_threshold, min_hotspot_area_pixels, max_grouping_distance_meters))
     {
         // 如果加载失败，将使用在 main.cpp 顶部定义的硬编码值
