@@ -4,6 +4,7 @@
 #include "thermoCam.h"         // 热成像相机调用和使用
 #include <iostream>
 #include <opencv2/opencv.hpp> // 确保包含OpenCV
+#include <cmath>              // 用于计算角度和距离
 
 // --- 全局相机参数定义 (在 utils.h 中声明为 extern) ---
 // // 这些值理想情况下从 config/camera_params.xml 加载，这里使用一个假数据占位
@@ -18,6 +19,20 @@ double  min_hotspot_area_pixels;
 float max_grouping_distance_meters;
 
 // --- utils.h 中声明的辅助函数实现 ---
+
+/**
+ * @brief 将笛卡尔坐标转换为球坐标
+ * 
+ * @param point 输入的笛卡尔坐标点 (x, y, z)
+ * @return SphericalCoordinate 转换后的球坐标
+ */
+SphericalCoordinate cartesianToSpherical(const cv::Point3f &point) {
+    float r = std::sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+    float theta = std::atan2(point.y, point.x);         // Azimuth 角 (水平方向)
+    float phi = std::acos(point.z / r);                 // Elevation 角 (垂直方向)
+
+    return SphericalCoordinate(r, theta, phi);
+}
 
 // ! 具体距离、角度等内容的坐标转换需要之后根据实际情况实现
 /**
