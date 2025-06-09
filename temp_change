@@ -1,0 +1,528 @@
+好的，我们来将上一份拆分后的代码（包含 `main.cpp`, `vision_processing.h/cpp`, `utils.h`）与您提出的基于FOV和像素比例计算云台角度指令的建议结合起来。
+
+主要修改点：
+
+1.  **`utils.h`**:
+    *   添加 `CloudGimbalAngles` 结构体。
+    *   添加相机FOV参数的声明（作为全局配置）。
+    *   添加喷嘴偏移角度参数的声明。
+2.  **`vision_processing.h`**:
+    *   添加 `calculateGimbalAngles` 函数的声明。
+3.  **`vision_processing.cpp`**:
+    *   实现 `calculateGimbalAngles` 函数。
+4.  **`main.cpp`**:
+    *   在主循环中，当检测到喷射目标后，调用 `calculateGimbalAngles` 计算云台指令。
+    *   初始化FOV和喷嘴偏移参数（实际应用中可能从配置文件读取）。
+
+下面是修改后的代码：
+
+**1. `src/utils.h`**
+
+```cpp
+// src/utils.h
+#ifndef UTILS_H
+#define UTILS_H
+
+#include <opencv2/opencv.hpp>
+#include <vector>
+#include <string>
+#include <cmath> // For fmod if needed for angle normalization
+
+// --- 配置参数 ---
+const float FIRE_TEMPERATURE_THRESHOLD_CELSIUS = 150.0f;
+const double MIN_HOTSPOT_AREA_PIXELS = 30.0;
+const float MAX_GROUPING_DISTANCE_METERS = 1.0f;
+const float ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS = 5.0f; // !!! 强假设 !!!
+
+// --- 相机内参和FOV (理想情况下从 camera_params.xml 或专门的相机配置文件加载) ---
+extern cv::Mat CAMERA_MATRIX;
+extern cv::Mat DIST_COEFFS;
+extern float CAMERA_HFOV_DEGREES; // 水平视场角
+extern float CAMERA_VFOV_DEGREES; // 垂直视场角
+
+// --- 喷嘴偏移参数 (通过标定获得) ---
+extern float NOZZLE_OFFSET_AZIMUTH_DEGREES; // 喷嘴相对相机的回转角偏移
+extern float NOZZLE_OFFSET_PITCH_DEGREES;   // 喷嘴相对相机的俯仰角偏移
+
+
+// --- 结构体定义 ---
+struct HotSpot {
+    int id;
+    cv::Point2f pixel_centroid;
+    cv::Point3f world_coord_approx;
+    double area_pixels;
+    float max_temperature;
+    std::vector<cv::Point> contour_pixels;
+    bool grouped = false;
+
+    HotSpot() : id(-1), area_pixels(0.0), max_temperature(0.0f), grouped(false) {}
+};
+
+struct SprayTarget {
+    int id;
+    cv::Point2f final_pixel_aim_point;
+    cv::Point3f final_world_aim_point_approx;
+    std::vector<int> source_hotspot_ids;
+    float estimated_severity;
+
+    SprayTarget() : id(-1), estimated_severity(0.0f) {}
+
+    bool operator<(const SprayTarget& other) const {
+        return estimated_severity > other.estimated_severity;
+    }
+};
+
+// 新增：云台角度结构体
+struct CloudGimbalAngles {
+    float target_azimuth_degrees;
+    float target_pitch_degrees;
+
+    CloudGimbalAngles() : target_azimuth_degrees(0.0f), target_pitch_degrees(0.0f) {}
+};
+
+
+// --- 通用辅助函数声明 ---
+cv::Point3f pixelToApproxWorld(const cv::Point2f& pixel_coord, const cv::Mat& cam_matrix, float distance_to_plane);
+float calculateRealWorldDistance(const cv::Point3f& p1, const cv::Point3f& p2);
+bool getSimulatedTemperatureMatrix(cv::Mat& temp_matrix, int rows, int cols); // 保持模拟数据函数
+
+
+#endif // UTILS_H
+```
+
+**2. `src/vision_processing.h`**
+
+```cpp
+// src/vision_processing.h
+#ifndef VISION_PROCESSING_H
+#define VISION_PROCESSING_H
+
+#include "utils.h"
+#include <opencv2/opencv.hpp>
+#include <vector>
+
+// --- 核心视觉处理函数声明 ---
+
+std::vector<HotSpot> detectAndFilterHotspots(
+    const cv::Mat& temp_matrix,
+    const cv::Mat& camera_matrix,
+    float assumed_distance_to_fire_plane
+);
+
+std::vector<SprayTarget> determineSprayTargets(
+    std::vector<HotSpot>& hot_spots,
+    float max_grouping_distance
+);
+
+void visualizeResults(
+    cv::Mat& display_image,
+    const std::vector<HotSpot>& hot_spots,
+    const std::vector<SprayTarget>& spray_targets
+);
+
+// 新增：计算云台角度函数声明
+CloudGimbalAngles calculateGimbalAngles(
+    const cv::Point2f& target_pixel_coords,
+    int image_width,
+    int image_height,
+    float camera_hfov_degrees,
+    float camera_vfov_degrees,
+    float current_cloud_azimuth_degrees, // 云台当前的回转角 (从外部获取)
+    float current_cloud_pitch_degrees,   // 云台当前的俯仰角 (从外部获取)
+    float nozzle_offset_azimuth_degrees,
+    float nozzle_offset_pitch_degrees
+);
+
+#endif // VISION_PROCESSING_H
+```
+
+**3. `src/vision_processing.cpp`**
+
+```cpp
+// src/vision_processing.cpp
+#include "vision_processing.h"
+#include <iostream>
+#include <algorithm>
+#include <cmath> // For std::abs, fmod
+
+// detectAndFilterHotspots, determineSprayTargets, visualizeResults 函数实现保持不变 (来自上一版本)
+// ... (此处省略，与上一版本相同) ...
+
+std::vector<HotSpot> detectAndFilterHotspots(
+    const cv::Mat& temp_matrix,
+    const cv::Mat& camera_matrix_param,
+    float assumed_distance_to_fire_plane_param
+) {
+    std::vector<HotSpot> detected_spots;
+    if (temp_matrix.empty() || temp_matrix.type() != CV_32FC1) {
+        std::cerr << "Error: Temperature matrix is empty or not CV_32FC1 type." << std::endl;
+        return detected_spots;
+    }
+
+    cv::Mat binary_mask;
+    cv::threshold(temp_matrix, binary_mask, FIRE_TEMPERATURE_THRESHOLD_CELSIUS, 255.0, cv::THRESH_BINARY);
+    binary_mask.convertTo(binary_mask, CV_8U);
+
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
+    cv::morphologyEx(binary_mask, binary_mask, cv::MORPH_OPEN, kernel, cv::Point(-1,-1), 1);
+    cv::morphologyEx(binary_mask, binary_mask, cv::MORPH_CLOSE, kernel, cv::Point(-1,-1), 1);
+
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(binary_mask.clone(), contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+    int spot_id_counter = 0;
+    for (const auto& contour : contours) {
+        double area = cv::contourArea(contour);
+        if (area < MIN_HOTSPOT_AREA_PIXELS) continue;
+
+        cv::Moments M = cv::moments(contour);
+        if (M.m00 == 0) continue;
+        cv::Point2f centroid(static_cast<float>(M.m10 / M.m00), static_cast<float>(M.m01 / M.m00));
+
+        cv::Rect bounding_box = cv::boundingRect(contour);
+        cv::Mat spot_roi_mask = cv::Mat::zeros(temp_matrix.size(), CV_8U);
+        cv::drawContours(spot_roi_mask, std::vector<std::vector<cv::Point>>{contour}, -1, cv::Scalar(255), cv::FILLED);
+        double min_temp, max_temp_in_roi;
+        cv::minMaxLoc(temp_matrix, &min_temp, &max_temp_in_roi, nullptr, nullptr, spot_roi_mask);
+
+        HotSpot spot;
+        spot.id = spot_id_counter++;
+        spot.pixel_centroid = centroid;
+        spot.area_pixels = area;
+        spot.max_temperature = static_cast<float>(max_temp_in_roi);
+        spot.contour_pixels = contour;
+        spot.world_coord_approx = pixelToApproxWorld(centroid, camera_matrix_param, assumed_distance_to_fire_plane_param);
+        detected_spots.push_back(spot);
+    }
+    return detected_spots;
+}
+
+std::vector<SprayTarget> determineSprayTargets(
+    std::vector<HotSpot>& hot_spots,
+    float max_grouping_distance_param
+) {
+    std::vector<SprayTarget> final_targets;
+    if (hot_spots.empty()) return final_targets;
+
+    for (auto& spot : hot_spots) spot.grouped = false;
+
+    int target_id_counter = 0;
+    for (size_t i = 0; i < hot_spots.size(); ++i) {
+        if (hot_spots[i].grouped) continue;
+
+        SprayTarget current_target;
+        current_target.id = target_id_counter++;
+        current_target.source_hotspot_ids.push_back(hot_spots[i].id);
+        hot_spots[i].grouped = true;
+
+        cv::Point2f sum_pixel_centroids = hot_spots[i].pixel_centroid;
+        cv::Point3f sum_world_centroids_approx = hot_spots[i].world_coord_approx;
+        float total_severity_metric = static_cast<float>(hot_spots[i].area_pixels * hot_spots[i].max_temperature);
+        int num_in_group = 1;
+
+        for (size_t j = i + 1; j < hot_spots.size(); ++j) {
+            if (hot_spots[j].grouped) continue;
+            if (calculateRealWorldDistance(hot_spots[i].world_coord_approx, hot_spots[j].world_coord_approx) < max_grouping_distance_param) {
+                hot_spots[j].grouped = true;
+                current_target.source_hotspot_ids.push_back(hot_spots[j].id);
+                sum_pixel_centroids += hot_spots[j].pixel_centroid;
+                sum_world_centroids_approx += hot_spots[j].world_coord_approx;
+                total_severity_metric += static_cast<float>(hot_spots[j].area_pixels * hot_spots[j].max_temperature);
+                num_in_group++;
+            }
+        }
+
+        current_target.final_pixel_aim_point = sum_pixel_centroids * (1.0f / num_in_group);
+        if (sum_world_centroids_approx.z != 0.0f && num_in_group > 0) {
+             current_target.final_world_aim_point_approx = sum_world_centroids_approx * (1.0f / num_in_group);
+        } else {
+            current_target.final_world_aim_point_approx = cv::Point3f(0,0,0);
+        }
+        current_target.estimated_severity = total_severity_metric;
+        final_targets.push_back(current_target);
+    }
+
+    std::sort(final_targets.begin(), final_targets.end());
+    return final_targets;
+}
+
+
+void visualizeResults(
+    cv::Mat& display_image,
+    const std::vector<HotSpot>& hot_spots,
+    const std::vector<SprayTarget>& spray_targets
+) {
+    for (const auto& spot : hot_spots) {
+        cv::drawContours(display_image, std::vector<std::vector<cv::Point>>{spot.contour_pixels}, -1, cv::Scalar(0, 255, 0), 1);
+        cv::circle(display_image, spot.pixel_centroid, 3, cv::Scalar(0, 0, 255), -1);
+    }
+
+    int target_rank = 1;
+    for (const auto& target : spray_targets) {
+        cv::circle(display_image, target.final_pixel_aim_point, 8, cv::Scalar(255, 0, 255), 2);
+        cv::putText(display_image, "T" + std::to_string(target_rank++),
+                    target.final_pixel_aim_point + cv::Point2f(10, 0),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 0), 2);
+    }
+}
+
+
+// 新增：计算云台角度函数实现
+CloudGimbalAngles calculateGimbalAngles(
+    const cv::Point2f& target_pixel_coords,
+    int image_width,
+    int image_height,
+    float camera_hfov_degrees,
+    float camera_vfov_degrees,
+    float current_cloud_azimuth_degrees,
+    float current_cloud_pitch_degrees,
+    float nozzle_offset_azimuth_degrees,
+    float nozzle_offset_pitch_degrees
+) {
+    if (image_width <= 0 || image_height <= 0 || camera_hfov_degrees <= 0 || camera_vfov_degrees <= 0) {
+        std::cerr << "Error: Invalid image dimensions or FOV for angle calculation." << std::endl;
+        return {current_cloud_azimuth_degrees, current_cloud_pitch_degrees}; // Return current if params invalid
+    }
+
+    float cx = static_cast<float>(image_width) / 2.0f;
+    float cy = static_cast<float>(image_height) / 2.0f;
+
+    float delta_azimuth_pixels = target_pixel_coords.x - cx;
+    // 像素偏移 / 半宽度像素 * 半FOV = 角度偏移
+    float delta_azimuth_degrees = (delta_azimuth_pixels / cx) * (camera_hfov_degrees / 2.0f);
+
+    float delta_pitch_pixels = target_pixel_coords.y - cy;
+    // 注意：图像Y轴通常向下为正。如果云台向上为正Pitch，则需要反转符号。
+    // 假设：目标在图像下方 (target_pixel_coords.y > cy) -> delta_pitch_pixels 为正
+    // 此时如果希望云台向上运动 (正Pitch)，则delta_pitch_degrees应为正。
+    // 如果希望云台向下运动 (负Pitch)，则delta_pitch_degrees应为负。
+    // 这里的实现：Y向下为正像素偏移，假设对应云台PITCH向上为正角度。
+    // (如果云台向上为负Pitch，则delta_pitch_degrees需要乘以-1)
+    float delta_pitch_degrees = (delta_pitch_pixels / cy) * (camera_vfov_degrees / 2.0f);
+    // 示例：如果图像Y向下对应云台俯仰角向下（负值），则需要反转。
+    // delta_pitch_degrees *= -1.0f; // 根据您的云台定义调整
+
+    CloudGimbalAngles angles;
+    angles.target_azimuth_degrees = current_cloud_azimuth_degrees + delta_azimuth_degrees - nozzle_offset_azimuth_degrees;
+    angles.target_pitch_degrees   = current_cloud_pitch_degrees   + delta_pitch_degrees   - nozzle_offset_pitch_degrees;
+
+    // 简单的角度归一化 (示例，实际云台可能有特定范围和处理方式)
+    // angles.target_azimuth_degrees = fmod(fmod(angles.target_azimuth_degrees, 360.0f) + 360.0f, 360.0f);
+    // 俯仰角通常有机械限位，例如 [-90, 90] 或 [-45, 45]
+    // if (angles.target_pitch_degrees > 45.0f) angles.target_pitch_degrees = 45.0f;
+    // if (angles.target_pitch_degrees < -45.0f) angles.target_pitch_degrees = -45.0f;
+
+
+    // 调试信息
+    // std::cout << "Target Pixel: (" << target_pixel_coords.x << ", " << target_pixel_coords.y << ")" << std::endl;
+    // std::cout << "Image Center: (" << cx << ", " << cy << ")" << std::endl;
+    // std::cout << "Delta Pixels (Az, P): (" << delta_azimuth_pixels << ", " << delta_pitch_pixels << ")" << std::endl;
+    // std::cout << "Delta Degrees (Az, P): (" << delta_azimuth_degrees << ", " << delta_pitch_degrees << ")" << std::endl;
+    // std::cout << "Nozzle Offset (Az, P): (" << nozzle_offset_azimuth_degrees << ", " << nozzle_offset_pitch_degrees << ")" << std::endl;
+    // std::cout << "Current Cloud (Az, P): (" << current_cloud_azimuth_degrees << ", " << current_cloud_pitch_degrees << ")" << std::endl;
+    // std::cout << "Calculated Target Cloud (Az, P): (" << angles.target_azimuth_degrees << ", " << angles.target_pitch_degrees << ")" << std::endl;
+
+    return angles;
+}
+```
+
+**4. `src/main.cpp`**
+
+```cpp
+// src/main.cpp
+#include "vision_processing.h"
+#include "utils.h"
+#include <iostream>
+#include <opencv2/opencv.hpp>
+
+// --- 全局相机参数定义 ---
+cv::Mat CAMERA_MATRIX = (cv::Mat_<double>(3, 3) << // 默认值
+    500.0, 0.0,   320.0,
+    0.0,   500.0, 240.0,
+    0.0,   0.0,   1.0);
+cv::Mat DIST_COEFFS = cv::Mat::zeros(4, 1, CV_64F); // 默认值
+
+// 新增：全局FOV和喷嘴偏移参数定义 (默认值)
+float CAMERA_HFOV_DEGREES = 60.0f;
+float CAMERA_VFOV_DEGREES = 45.0f;
+float NOZZLE_OFFSET_AZIMUTH_DEGREES = 0.0f; // 假设初始无偏移或通过标定更新
+float NOZZLE_OFFSET_PITCH_DEGREES = 0.0f;   // 假设初始无偏移或通过标定更新
+
+
+// utils.h 中声明的辅助函数实现
+cv::Point3f pixelToApproxWorld(const cv::Point2f& pixel_coord, const cv::Mat& cam_matrix, float distance_to_plane) {
+    if (cam_matrix.empty() || cam_matrix.at<double>(0,0) == 0) {
+        return cv::Point3f(pixel_coord.x, pixel_coord.y, 0.0f);
+    }
+    double fx = cam_matrix.at<double>(0, 0);
+    double fy = cam_matrix.at<double>(1, 1);
+    double cx = cam_matrix.at<double>(0, 2);
+    double cy = cam_matrix.at<double>(1, 2);
+
+    double X = (pixel_coord.x - cx) * distance_to_plane / fx;
+    double Y = (pixel_coord.y - cy) * distance_to_plane / fy;
+    return cv::Point3f(static_cast<float>(X), static_cast<float>(Y), distance_to_plane);
+}
+
+float calculateRealWorldDistance(const cv::Point3f& p1, const cv::Point3f& p2) {
+    if (p1.z == 0.0f || p2.z == 0.0f) return FLT_MAX;
+    return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2) + std::pow(p1.z - p2.z, 2));
+}
+
+bool getSimulatedTemperatureMatrix(cv::Mat& temp_matrix, int rows, int cols) {
+    temp_matrix = cv::Mat(rows, cols, CV_32FC1);
+    cv::randu(temp_matrix, cv::Scalar(20.0f), cv::Scalar(40.0f));
+    cv::circle(temp_matrix, cv::Point(cols / 4, rows / 3), 15, cv::Scalar(250.0f), -1);
+    cv::circle(temp_matrix, cv::Point(cols / 4 + 30, rows / 3 + 20), 12, cv::Scalar(200.0f), -1);
+    cv::circle(temp_matrix, cv::Point(cols * 3 / 4, rows / 2), 20, cv::Scalar(300.0f), -1);
+    cv::circle(temp_matrix, cv::Point(cols / 2, rows * 3 / 4), 3, cv::Scalar(180.0f), -1);
+    return !temp_matrix.empty();
+}
+
+// 配置加载函数 (示例，可以扩展以加载FOV和喷嘴偏移)
+bool loadCameraParameters(const std::string& filename,
+                          cv::Mat& cam_matrix_out, cv::Mat& dist_coeffs_out,
+                          float& hfov_out, float& vfov_out,
+                          float& nozzle_az_offset_out, float& nozzle_p_offset_out) {
+    cv::FileStorage fs(filename, cv::FileStorage::READ);
+    if (!fs.isOpened()) {
+        std::cerr << "Error: Could not open parameters file: " << filename << std::endl;
+        std::cerr << "Using default/hardcoded parameters." << std::endl;
+        return false;
+    }
+    fs["camera_matrix"] >> cam_matrix_out;
+    fs["distortion_coefficients"] >> dist_coeffs_out;
+    // 假设配置文件中也存储了这些值
+    if (fs["HFOV_degrees"].isReal()) fs["HFOV_degrees"] >> hfov_out; else std::cout << "Warning: HFOV_degrees not found in " << filename << std::endl;
+    if (fs["VFOV_degrees"].isReal()) fs["VFOV_degrees"] >> vfov_out; else std::cout << "Warning: VFOV_degrees not found in " << filename << std::endl;
+    if (fs["nozzle_offset_azimuth_degrees"].isReal()) fs["nozzle_offset_azimuth_degrees"] >> nozzle_az_offset_out; else std::cout << "Warning: nozzle_offset_azimuth_degrees not found in " << filename << std::endl;
+    if (fs["nozzle_offset_pitch_degrees"].isReal()) fs["nozzle_offset_pitch_degrees"] >> nozzle_p_offset_out; else std::cout << "Warning: nozzle_offset_pitch_degrees not found in " << filename << std::endl;
+
+    fs.release();
+    std::cout << "Parameters loaded from " << filename << std::endl;
+    return true;
+}
+
+
+int main() {
+    cv::Mat temperature_matrix;
+    cv::Mat display_image;
+
+    int frame_rows = 480;
+    int frame_cols = 640;
+
+    std::string params_file = "../config/camera_params.xml"; // 或者其他配置文件名
+    if (!loadCameraParameters(params_file, CAMERA_MATRIX, DIST_COEFFS,
+                              CAMERA_HFOV_DEGREES, CAMERA_VFOV_DEGREES,
+                              NOZZLE_OFFSET_AZIMUTH_DEGREES, NOZZLE_OFFSET_PITCH_DEGREES)) {
+        std::cout << "Using hardcoded default parameters due to load failure." << std::endl;
+    }
+    // 打印加载或使用的参数
+    std::cout << "Using HFOV: " << CAMERA_HFOV_DEGREES << ", VFOV: " << CAMERA_VFOV_DEGREES << std::endl;
+    std::cout << "Using Nozzle Offset Az: " << NOZZLE_OFFSET_AZIMUTH_DEGREES << ", Pitch: " << NOZZLE_OFFSET_PITCH_DEGREES << std::endl;
+
+
+    std::cout << "Vision Processing for Fire Suppression Started." << std::endl;
+    std::cout << "Press 'q' or ESC to exit." << std::endl;
+
+    // 模拟云台当前角度 (实际应用中从云台反馈获取)
+    float current_gimbal_azimuth = 0.0f;
+    float current_gimbal_pitch = 0.0f;
+
+    while (true) {
+        if (!getSimulatedTemperatureMatrix(temperature_matrix, frame_rows, frame_cols)) {
+            std::cerr << "Error: Could not get temperature matrix." << std::endl;
+            break;
+        }
+
+        std::vector<HotSpot> hot_spots = detectAndFilterHotspots(temperature_matrix, CAMERA_MATRIX, ASSUMED_DISTANCE_TO_FIRE_PLANE_METERS);
+        std::vector<SprayTarget> spray_targets = determineSprayTargets(hot_spots, MAX_GROUPING_DISTANCE_METERS);
+
+        cv::Mat normalized_temp;
+        cv::normalize(temperature_matrix, normalized_temp, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+        cv::applyColorMap(normalized_temp, display_image, cv::COLORMAP_JET);
+        visualizeResults(display_image, hot_spots, spray_targets);
+
+        if (!spray_targets.empty()) {
+            const SprayTarget& primary_target = spray_targets[0]; // 取最严重的目标
+            std::cout << "Primary Target Pixel: (" << primary_target.final_pixel_aim_point.x
+                      << ", " << primary_target.final_pixel_aim_point.y << ")" << std::endl;
+
+            CloudGimbalAngles desired_angles = calculateGimbalAngles(
+                primary_target.final_pixel_aim_point,
+                frame_cols, frame_rows,
+                CAMERA_HFOV_DEGREES, CAMERA_VFOV_DEGREES,
+                current_gimbal_azimuth, current_gimbal_pitch, // 传入当前云台角度
+                NOZZLE_OFFSET_AZIMUTH_DEGREES, NOZZLE_OFFSET_PITCH_DEGREES
+            );
+
+            std::cout << "Calculated Gimbal Command -> Target Azimuth: " << desired_angles.target_azimuth_degrees
+                      << ", Target Pitch: " << desired_angles.target_pitch_degrees << std::endl;
+
+            // TODO: 在此处将 desired_angles 发送给云台控制器
+            // TODO: 更新 current_gimbal_azimuth 和 current_gimbal_pitch 为云台移动后的实际角度
+            // current_gimbal_azimuth = desired_angles.target_azimuth_degrees; // 简化模拟
+            // current_gimbal_pitch = desired_angles.target_pitch_degrees;   // 简化模拟
+
+        } else {
+            std::cout << "No spray targets detected." << std::endl;
+        }
+        std::cout << "------------------------------------" << std::endl;
+
+        cv::imshow("Fire Detection Visual Output", display_image);
+        char key = (char)cv::waitKey(500); // 增加延时方便观察
+        if (key == 'q' || key == 27) {
+            break;
+        }
+    }
+
+    cv::destroyAllWindows();
+    std::cout << "Vision Processing Terminated." << std::endl;
+    return 0;
+}
+```
+
+**5. `config/camera_params.xml` (示例，需要添加FOV和喷嘴偏移)**
+
+```xml
+<?xml version="1.0"?>
+<opencv_storage>
+  <camera_matrix type_id="opencv-matrix">
+    <rows>3</rows>
+    <cols>3</cols>
+    <dt>d</dt>
+    <data>
+      500.0 0. 320.0
+      0. 500.0 240.0
+      0. 0. 1.</data></camera_matrix>
+  <distortion_coefficients type_id="opencv-matrix">
+    <rows>5</rows>
+    <cols>1</cols>
+    <dt>d</dt>
+    <data>
+      0.0 0.0 0.0 0.0 0.0 </data></distortion_coefficients> <!-- k1, k2, p1, p2, k3 -->
+  <!-- 新增参数 -->
+  <HFOV_degrees>60.0</HFOV_degrees>
+  <VFOV_degrees>45.0</VFOV_degrees>
+  <nozzle_offset_azimuth_degrees>1.5</nozzle_offset_azimuth_degrees> <!-- 示例：喷嘴在相机右侧1.5度 -->
+  <nozzle_offset_pitch_degrees>-2.0</nozzle_offset_pitch_degrees>  <!-- 示例：喷嘴在相机下方2度 (导致相机要向上看一点才能让喷嘴对准) -->
+</opencv_storage>
+```
+
+**关键更改：**
+
+*   **参数化：** FOV和喷嘴偏移现在是全局变量（理想情况是从配置文件加载），并传递给 `calculateGimbalAngles`。
+*   **`calculateGimbalAngles` 函数：** 新增了这个函数，实现了基于像素偏移和FOV计算目标角度的逻辑，并考虑了喷嘴偏移。
+*   **主循环更新：** 在 `main.cpp` 中，如果检测到目标，会调用 `calculateGimbalAngles` 并打印计算出的云台指令角度。
+*   **配置文件加载：** `loadCameraParameters` 函数示例已扩展，以尝试从XML文件加载新的FOV和喷嘴偏移参数。
+*   **当前云台角度：** `calculateGimbalAngles` 函数现在需要云台的当前回转角和俯仰角作为输入。在 `main.cpp` 中，我用 `current_gimbal_azimuth` 和 `current_gimbal_pitch` 进行了模拟。在实际系统中，这些值需要从云台的编码器或控制器反馈中获取。
+
+**重要提示：**
+
+*   **云台坐标系和符号约定：** `calculateGimbalAngles` 中关于 `delta_pitch_degrees` 的符号需要根据您的云台的具体行为来调整（例如，图像Y轴向下增加，是对应云台俯仰角向上增加还是向下增加）。
+*   **喷嘴偏移标定：** `NOZZLE_OFFSET_AZIMUTH_DEGREES` 和 `NOZZLE_OFFSET_PITCH_DEGREES` **必须通过实际实验标定**才能获得准确值。
+*   **相机FOV：** `CAMERA_HFOV_DEGREES` 和 `CAMERA_VFOV_DEGREES` 必须是您正在使用的红外相机的准确视场角。
+*   **云台反馈：** 为了实现闭环控制或连续跟踪，您需要从云台获取其实际的当前角度，并在计算下一条指令时使用这些反馈值。
+*   **角度归一化和限位：** 实际发送给云台的角度指令可能需要归一化到特定范围（如0-360度），并考虑云台的机械运动限位。
+
+这个修改后的版本为您提供了一个更完整的框架，将视觉检测与基于角度的云台控制指令生成结合了起来。
