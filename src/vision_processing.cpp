@@ -4,8 +4,7 @@
 #include <algorithm>
 #include <cmath> // For std::abs, fmod
 
-// detectAndFilterHotspots, determineSprayTargets, visualizeResults 函数实现保持不变 (来自上一版本)
-// ... (此处省略，与上一版本相同) ...
+// detectAndFilterHotspots, determineSprayTargets, visualizeResults 函数实现保持不变 
 
 std::vector<HotSpot> detectAndFilterHotspots(
     const cv::Mat& temp_matrix,

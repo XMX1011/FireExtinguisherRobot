@@ -82,11 +82,11 @@
 │   ├── main.cpp                    # 主程序入口
 │   ├── vision_processing.h         # 视觉处理函数声明
 │   ├── vision_processing.cpp       # 视觉处理函数实现
-│   ├── thermoCam.h                 # 红外相机相关代码声明
-│   ├── thermoCam.cpp               # 红外相机相关代码实现
+│   ├── IRCam.h                     # 红外相机相关代码声明
+│   ├── IRCam.cpp                   # 红外相机相关代码实现
 │   └── utils.h                     # 数据结构定义 (HotSpot, SprayTarget)
 ├── include/                        # 存放项目内部头文件，如相机SDK头文件
 ├── CMakeLists.txt                  # CMake 编译配置文件
 ├── README.md                       # 本文件
 └── config/                         # 存放配置文件
-    └── camera_params.xml           # 存放相机标定参数
+    └── params.xml                  # 存放相机标定参数
