@@ -4,15 +4,16 @@
 #include <algorithm>
 #include <cmath> // For std::abs, fmod
 
-// detectAndFilterHotspots, determineSprayTargets, visualizeResults 函数实现保持不变 
+// detectAndFilterHotspots, determineSprayTargets, visualizeResults 函数实现保持不变
 
 std::vector<HotSpot> detectAndFilterHotspots(
-    const cv::Mat& temp_matrix,
-    const cv::Mat& camera_matrix_param,
-    float assumed_distance_to_fire_plane_param
-) {
+    const cv::Mat &temp_matrix,
+    const cv::Mat &camera_matrix_param,
+    float assumed_distance_to_fire_plane_param)
+{
     std::vector<HotSpot> detected_spots;
-    if (temp_matrix.empty() || temp_matrix.type() != CV_32FC1) {
+    if (temp_matrix.empty() || temp_matrix.type() != CV_32FC1)
+    {
         std::cerr << "Error: Temperature matrix is empty or not CV_32FC1 type." << std::endl;
         return detected_spots;
     }
@@ -22,19 +23,22 @@ std::vector<HotSpot> detectAndFilterHotspots(
     binary_mask.convertTo(binary_mask, CV_8U);
 
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5, 5));
-    cv::morphologyEx(binary_mask, binary_mask, cv::MORPH_OPEN, kernel, cv::Point(-1,-1), 1);
-    cv::morphologyEx(binary_mask, binary_mask, cv::MORPH_CLOSE, kernel, cv::Point(-1,-1), 1);
+    cv::morphologyEx(binary_mask, binary_mask, cv::MORPH_OPEN, kernel, cv::Point(-1, -1), 1);
+    cv::morphologyEx(binary_mask, binary_mask, cv::MORPH_CLOSE, kernel, cv::Point(-1, -1), 1);
 
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(binary_mask.clone(), contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
     int spot_id_counter = 0;
-    for (const auto& contour : contours) {
+    for (const auto &contour : contours)
+    {
         double area = cv::contourArea(contour);
-        if (area < MIN_HOTSPOT_AREA_PIXELS) continue;
+        if (area < MIN_HOTSPOT_AREA_PIXELS)
+            continue;
 
         cv::Moments M = cv::moments(contour);
-        if (M.m00 == 0) continue;
+        if (M.m00 == 0)
+            continue;
         cv::Point2f centroid(static_cast<float>(M.m10 / M.m00), static_cast<float>(M.m01 / M.m00));
 
         cv::Rect bounding_box = cv::boundingRect(contour);
@@ -56,17 +60,21 @@ std::vector<HotSpot> detectAndFilterHotspots(
 }
 
 std::vector<SprayTarget> determineSprayTargets(
-    std::vector<HotSpot>& hot_spots,
-    float max_grouping_distance_param
-) {
+    std::vector<HotSpot> &hot_spots,
+    float max_grouping_distance_param)
+{
     std::vector<SprayTarget> final_targets;
-    if (hot_spots.empty()) return final_targets;
+    if (hot_spots.empty())
+        return final_targets;
 
-    for (auto& spot : hot_spots) spot.grouped = false;
+    for (auto &spot : hot_spots)
+        spot.grouped = false;
 
     int target_id_counter = 0;
-    for (size_t i = 0; i < hot_spots.size(); ++i) {
-        if (hot_spots[i].grouped) continue;
+    for (size_t i = 0; i < hot_spots.size(); ++i)
+    {
+        if (hot_spots[i].grouped)
+            continue;
 
         SprayTarget current_target;
         current_target.id = target_id_counter++;
@@ -78,9 +86,12 @@ std::vector<SprayTarget> determineSprayTargets(
         float total_severity_metric = static_cast<float>(hot_spots[i].area_pixels * hot_spots[i].max_temperature);
         int num_in_group = 1;
 
-        for (size_t j = i + 1; j < hot_spots.size(); ++j) {
-            if (hot_spots[j].grouped) continue;
-            if (calculateRealWorldDistance(hot_spots[i].world_coord_approx, hot_spots[j].world_coord_approx) < max_grouping_distance_param) {
+        for (size_t j = i + 1; j < hot_spots.size(); ++j)
+        {
+            if (hot_spots[j].grouped)
+                continue;
+            if (calculateRealWorldDistance(hot_spots[i].world_coord_approx, hot_spots[j].world_coord_approx) < max_grouping_distance_param)
+            {
                 hot_spots[j].grouped = true;
                 current_target.source_hotspot_ids.push_back(hot_spots[j].id);
                 sum_pixel_centroids += hot_spots[j].pixel_centroid;
@@ -91,10 +102,13 @@ std::vector<SprayTarget> determineSprayTargets(
         }
 
         current_target.final_pixel_aim_point = sum_pixel_centroids * (1.0f / num_in_group);
-        if (sum_world_centroids_approx.z != 0.0f && num_in_group > 0) {
-             current_target.final_world_aim_point_approx = sum_world_centroids_approx * (1.0f / num_in_group);
-        } else {
-            current_target.final_world_aim_point_approx = cv::Point3f(0,0,0);
+        if (sum_world_centroids_approx.z != 0.0f && num_in_group > 0)
+        {
+            current_target.final_world_aim_point_approx = sum_world_centroids_approx * (1.0f / num_in_group);
+        }
+        else
+        {
+            current_target.final_world_aim_point_approx = cv::Point3f(0, 0, 0);
         }
         current_target.estimated_severity = total_severity_metric;
         final_targets.push_back(current_target);
@@ -104,19 +118,20 @@ std::vector<SprayTarget> determineSprayTargets(
     return final_targets;
 }
 
-
 void visualizeResults(
-    cv::Mat& display_image,
-    const std::vector<HotSpot>& hot_spots,
-    const std::vector<SprayTarget>& spray_targets
-) {
-    for (const auto& spot : hot_spots) {
+    cv::Mat &display_image,
+    const std::vector<HotSpot> &hot_spots,
+    const std::vector<SprayTarget> &spray_targets)
+{
+    for (const auto &spot : hot_spots)
+    {
         cv::drawContours(display_image, std::vector<std::vector<cv::Point>>{spot.contour_pixels}, -1, cv::Scalar(0, 255, 0), 1);
         cv::circle(display_image, spot.pixel_centroid, 3, cv::Scalar(0, 0, 255), -1);
     }
 
     int target_rank = 1;
-    for (const auto& target : spray_targets) {
+    for (const auto &target : spray_targets)
+    {
         cv::circle(display_image, target.final_pixel_aim_point, 8, cv::Scalar(255, 0, 255), 2);
         cv::putText(display_image, "T" + std::to_string(target_rank++),
                     target.final_pixel_aim_point + cv::Point2f(10, 0),
@@ -124,10 +139,9 @@ void visualizeResults(
     }
 }
 
-
 // 新增：计算云台角度函数实现
 CloudGimbalAngles calculateGimbalAngles(
-    const cv::Point2f& target_pixel_coords,
+    const cv::Point2f &target_pixel_coords,
     int image_width,
     int image_height,
     float camera_hfov_degrees,
@@ -135,9 +149,10 @@ CloudGimbalAngles calculateGimbalAngles(
     float current_cloud_azimuth_degrees,
     float current_cloud_pitch_degrees,
     float nozzle_offset_azimuth_degrees,
-    float nozzle_offset_pitch_degrees
-) {
-    if (image_width <= 0 || image_height <= 0 || camera_hfov_degrees <= 0 || camera_vfov_degrees <= 0) {
+    float nozzle_offset_pitch_degrees)
+{
+    if (image_width <= 0 || image_height <= 0 || camera_hfov_degrees <= 0 || camera_vfov_degrees <= 0)
+    {
         std::cerr << "Error: Invalid image dimensions or FOV for angle calculation." << std::endl;
         return {current_cloud_azimuth_degrees, current_cloud_pitch_degrees}; // Return current if params invalid
     }
@@ -162,14 +177,13 @@ CloudGimbalAngles calculateGimbalAngles(
 
     CloudGimbalAngles angles;
     angles.target_azimuth_degrees = current_cloud_azimuth_degrees + delta_azimuth_degrees - nozzle_offset_azimuth_degrees;
-    angles.target_pitch_degrees   = current_cloud_pitch_degrees   + delta_pitch_degrees   - nozzle_offset_pitch_degrees;
+    angles.target_pitch_degrees = current_cloud_pitch_degrees + delta_pitch_degrees - nozzle_offset_pitch_degrees;
 
     // 简单的角度归一化 (示例，实际云台可能有特定范围和处理方式)
     // angles.target_azimuth_degrees = fmod(fmod(angles.target_azimuth_degrees, 360.0f) + 360.0f, 360.0f);
     // 俯仰角通常有机械限位，例如 [-90, 90] 或 [-45, 45]
     // if (angles.target_pitch_degrees > 45.0f) angles.target_pitch_degrees = 45.0f;
     // if (angles.target_pitch_degrees < -45.0f) angles.target_pitch_degrees = -45.0f;
-
 
     // 调试信息
     std::cout << "Target Pixel: (" << target_pixel_coords.x << ", " << target_pixel_coords.y << ")" << std::endl;

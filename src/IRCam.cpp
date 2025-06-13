@@ -7,9 +7,8 @@
  * @brief   IRCam 类的实现文件
  *  需要注意的是需要等待具体sdk
  *  现在里面的代码毫无意义
- * 
+ *
  */
-
 
 // 将 IRCamImpl 定义为 IRCam 的嵌套类
 class IRCam::IRCamImpl

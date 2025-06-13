@@ -18,5 +18,5 @@ public:
     bool converetToTemperature(cv::Mat &frame, cv::Mat &temp_matrix);
 
 private:
-    IRCamImpl* pImpl;
+    IRCamImpl *pImpl;
 };
