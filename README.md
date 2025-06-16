@@ -72,7 +72,7 @@
 ### 使用
 1. 建立(若项目中不存在)和转到./build文件夹
 2. 使用mingw32-make.exe编译程序
-3. 运行程序 .\FireDetectionExe.exe <图片路径>
+3. 运行程序 .\FireDetectionExe.exe 
 4. 按下'q'或者'esc'退出程序
 
 ## 代码结构
@@ -83,10 +83,11 @@
 │   ├── vision_processing.h         # 视觉处理函数声明
 │   ├── vision_processing.cpp       # 视觉处理函数实现
 │   ├── IRCam.h                     # 红外相机相关代码声明
-│   ├── IRCam.cpp                   # 红外相机相关代码实现
+│   ├── IRCam.cpp                   # 红外相机相关代码实现，未完成
 │   └── utils.h                     # 数据结构定义 (HotSpot, SprayTarget)
 ├── include/                        # 存放项目内部头文件，如相机SDK头文件
 ├── CMakeLists.txt                  # CMake 编译配置文件
 ├── README.md                       # 本文件
+├── 说明.md                         # 说明文件
 └── config/                         # 存放配置文件
     └── params.xml                  # 存放相机标定参数
